@@ -1,0 +1,72 @@
+---
+title: "csv profiler"
+author: "Michael Levy"
+date: "`r Sys.Date()`"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r}
+ fileInput("csv", "Choose CSV File",
+        accept = c(
+          "text/csv",
+          "text/comma-separated-values,text/plain",
+          ".csv",
+          ".CSV")
+        )
+
+# Add custom null character input
+```
+
+```{r}
+
+renderTable({
+  filename <- input$csv
+
+  if (is.null(filename))
+    return(NULL)
+  
+  d <- read.csv(
+    filename$datapath,
+    # "testfile_Claim_EnrollmentBASE.csv",
+    na.strings = c("Null", "NULL", "null", "NA", "na", "N/A"),
+    stringsAsFactors = FALSE)
+  
+  deets <- 
+    lapply(d, function(x) {
+      dd <- data.frame(
+        Total = length(x),
+        Distinct_Count = length(unique(x)),
+        Null_Count = sum(is.na(x)),
+        Empty_String = sum(x == "", na.rm = TRUE),
+        Max_Length = as.integer(max(nchar(x), na.rm = TRUE))
+      )
+      # If there are only missing values
+      if (dd$Null_Count == length(x)) {
+        dd$Example_Max_value <- NA
+        dd$Data_type <- NA
+        dd$Max_Length <- 0L
+      } else {
+        dd$Example_Max_value = x[which.max(nchar(x))]
+        dd$Data_type = typeof(x)
+      }
+      dd$Percent_Not_Null <- 100 * (nrow(d) - dd$Null) / nrow(d)
+      dd$Percent_Not_Empty_String <- 100 * (nrow(d) - dd$Empty_String) / nrow(d)
+      
+      return(dd)
+    })
+  deets <- do.call(rbind, deets)
+  deets$Column_Title <- names(d)
+  rownames(deets) <- NULL
+  deets[order(pmin(deets$Percent_Not_Null, deets$Percent_Not_Empty_String), 
+              decreasing = TRUE), 
+        c(10, 7, 1:3, 8, 4, 9, 5, 6)]
+  })
+
+```
+
